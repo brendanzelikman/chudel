@@ -1,0 +1,8 @@
+@import "src/chudel.ck"
+@import "src/examples.ck"
+@import "src/hap.ck"
+@import "src/parser.ck"
+@import "src/pattern.ck"
+@import "src/sampler.ck"
+@import "src/scale.ck"
+@import "src/utils.ck"

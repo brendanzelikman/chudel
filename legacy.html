@@ -1,0 +1,428 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap" rel="stylesheet"> 
+    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ccrma/webchuck-ide@main/cdn/ace/ace.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ccrma/webchuck-ide@main/cdn/ace/editor.js"></script>
+   <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <style>
+      body { 
+        font-family: "Nunito";
+      } 
+      .wallpaper {
+        background: url('images/wallpaper.gif');
+        mix-blend-mode: color-dodge;
+      }
+      .function {
+        color: rgb(248, 158, 172);
+        font-weight: 400;
+      }
+      .code {
+        color: lightgreen;
+      }
+    </style>
+  </head>
+  <body class="bg-zinc-950/90">
+    <base target="_blank"/>
+    <main>
+      <article class="text-xl [&>section>header]:border-2 [&>section>header]:rounded [&>section]:font-light [&>section>header]:p-5 text-white">
+        <header class="min-h-76 w-full text-center relative">
+            <img src="images/wallpaper.gif" class="border-b border-b-green-200/80 absolute border-slate-50 size-full object-cover wallpaper"/> 
+            <div class="py-10">
+              <h1 class="text-9xl py-1 jumpman text-slate-50 drop-shadow-2xl">
+                chudel
+              </h1>
+              <div class="backdrop-blur-sm px-4 py-2 bg-zinc-950/50 hover:bg-zinc-950 border border-slate-50/10 rounded-lg w-min m-auto hover:scale-105 transition-all hover:border-slate-50/50">
+                <h2 class="text-5xl px-4 mx-auto select-none text-slate-50 whitespace-nowrap drop-shadow-2xl">
+                  Strudel in ChucK
+                </h2>
+              </div>
+              <div class="flex w-full justify-center gap-4 mt-4 *:font-normal *:drop-shadow-xl *:bg-zinc-950/50 *:hover:bg-zinc-950 *:backdrop-blur *:border *:border-slate-50/10 *:hover:border-slate-50/50 *:select-none *:transition-all *:px-4 *:py-2 *:rounded">
+                <h2>Music 220A</h2><h2>Final Project</h2><h2>Brendan Zelikman</h2>
+              </div>
+            </div>
+          </header>
+          <section class="space-y-4">
+            <p class="text-center pt-5 xl:max-w-1/2 mx-auto">
+              Chudel is a <a class="hover:text-blue-400 hover:underline" href="https://chuck.stanford.edu/">ChucKian</a> port of <a class="hover:text-blue-400 hover:underline" href="https://strudel.cc">Strudel</a>, a web-based live coding environment 
+              that is itself a <a class="hover:text-blue-400 hover:underline" href="https://developer.mozilla.org/en-US/docs/Web/JavaScript">JavaScript</a> port of <a class="hover:text-blue-400 hover:underline" href="https://tidalcycles.org">Tidal Cycles</a>, an algorithmic pattern language in <a class="hover:text-blue-400 hover:underline" href="https://haskell.org">Haskell</a>.
+              </p>
+              <!-- <p class="text-center">Yes, this is exactly like Inception. No, the irony is not lost on me.</p> -->
+              <div class="flex pb-5 gap-3 justify-center w-full max-md:flex-wrap">
+                 <button onclick="window.scrollTo({top: document.getElementById('ch1').offsetTop, behavior: 'smooth'})" class="text-xl px-4 py-2 cursor-pointer hover:scale-105 transition-all text-zinc-900 bg-slate-50/90 backdrop-blur font-light rounded-xl drop-shadow-2xl shadow-xl border-2 border-slate-800 font-light">
+                  <code>Mini-Mini-Notation</code>
+                </button>
+                 <button onclick="window.scrollTo({top: document.getElementById('ch2').offsetTop, behavior: 'smooth'})" class="text-xl px-4 py-2 cursor-pointer hover:scale-105 transition-all text-zinc-900 bg-slate-50/90 backdrop-blur font-light rounded-xl drop-shadow-2xl shadow-xl border-2 border-slate-800 font-light">
+                  <code>Chudel API</code>
+                </button>
+                 <button onclick="window.scrollTo({top: document.getElementById('ch3').offsetTop, behavior: 'smooth'})" class="text-xl px-4 py-2 cursor-pointer hover:scale-105 transition-all text-zinc-900 bg-slate-50/90 backdrop-blur font-light rounded-xl drop-shadow-2xl shadow-xl border-2 border-slate-800 font-light">
+                  <code>Musical Demos</code>
+                </button>
+              <a href="chudel.zip" download>
+                <button class="text-xl px-4 py-2 cursor-pointer hover:scale-105 transition-all text-zinc-900 bg-slate-50/90 backdrop-blur font-light rounded-xl drop-shadow-2xl shadow-xl border-2 border-slate-800 font-light">
+                  <code>Code</code>
+                </button>
+              </a>
+          </div>
+              </p>
+            <h5 id="ch1" class="text-5xl text-center mb-10 font-thin border-t pt-10">Mini-Mini-Notation</h5>
+            <p class="text-center">The foundation of Chudel is a crude and miniature version of Tidal/Strudel's Mini-Notation.</p>
+            <table class="w-1/2 mx-auto">
+              <thead>
+                <tr class="border-b-2">
+                  <th class="px-6 py-4 text-left min-w-64">Feature</th>
+                  <th class="px-6 py-4 text-left min-w-56">Syntax</th>
+                  <th class="px-6 py-4 text-left min-w-96">Example</th>
+                  <th class="px-6 py-4 text-left min-w-24">Audio</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Sequences</td>
+                  <td>Space</td>
+                  <td>
+                    <span class="function">sound</span>(<span class="code">"bd hh sd do"</span>)
+                  </td>
+                  <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/sequence.wav"></audio>
+                    </button>
+                  </td>
+                  </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Rests</td>
+                  <td>Dash or Tilde</td>
+                  <td><span class="function">sound</span>(<span class="code">"bd - sd ~"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/rest.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Parallel</td>
+                  <td>Comma</td>
+                  <td>
+                    <span class="function">sound</span>(<span class="code">"bd hh bd hh, sd sd"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/parallel.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Sub-sequences</td>
+                  <td>Square Brackets</td>
+                  <td>
+                    <span class="function">sound</span>(<span class="code">"bd hh bd [hh hh]"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/subsequence.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Sub-sub-sequences</td>
+                  <td>Nested Brackets</td>
+                  <td>
+                    <span class="function">sound</span>(<span class="code">"bd hh bd [hh [hh hh]]"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/subsubsequence.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Speed Up</td>
+                  <td>Asterisk</td>
+                  <td><span class="function">sound</span>(<span class="code">"bd hh*2 bd*3 hh*4"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/multiply.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                 <!-- <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Slow Down</td>
+                  <td>Slash</td>
+                  <td><span class="function">sound</span>(<span class="code">"bd hh bd [hh hh]/2"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/multiply.wav"></audio>
+                    </button>
+                  </td> -->
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Alternate</td>
+                  <td>Angle Brackets</td>
+                  <td>
+                    <span class="function">sound</span>(<span class="code">"bd hh bd &lt;sd cp&gt;"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/alternate.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                 <tr class="border-b *:align-center *:px-6 *:py-2">
+                  <td>Replicate</td>
+                  <td>Exclamation</td>
+                  <td><span class="function">sound</span>(<span class="code">"bd hh!2 sd"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/replicate.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                 <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Elongate</td>
+                  <td>At Sign</td>
+                  <td><span class="function">sound</span>(<span class="code">"bd hh@2 sd"</span>)
+                  </td>
+                   <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/mini/elongate.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <h5 id="ch2" class="text-5xl text-center mt-20 mb-10 font-thin border-t pt-10">Chudel API</h5>
+            <p class="text-center">The Chudel API is centered around the Chudel class which comes with a handful of functions.</p>
+            <table class="w-1/2 mx-auto">
+              <thead>
+                <tr class="border-b-2">
+                  <th class="px-6 py-4 text-left min-w-48">Feature</th>
+                  <th class="px-6 py-4 text-left min-w-48">Syntax</th>
+                  <th class="px-6 py-4 text-left min-w-128">Example (Click to Play!)</th>
+                </tr>
+              </thead>
+              <tbody>
+                 <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Initialize Class</td>
+                  <td>Chudel</td>
+                  <td>
+                    <span class="function">Chudel chudel;</span>
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Start Clock</td>
+                  <td>run() / loop()</td>
+                  <td>
+                    <span class="function">chudel.run</span>() / <span class="function">while (true) chudel.loop</span>();
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Play Sounds</td>
+                  <td>sound(<span class='text-gray-400'>string</span>)</td>
+                  <td> 
+                    <div class="cursor-pointer active:scale-105 transition-all" onclick="new Audio('snippets/api/sound.wav').play()">
+                    <span class="function">chudel.sound</span>(<span class="code">"bd hh sd do"</span>);
+                  </div>
+                  </td>
+              </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Play Notes</td>
+                  <td>note(<span class='text-gray-400'>string</span>)</td>
+                  <td>
+                    <div class="cursor-pointer active:scale-105 transition-all" onclick="new Audio('snippets/api/note.wav').play()">
+                    <span class="function">chudel.note</span>(<span class="code">"c4 e4 g4 c5"</span>).<span class="function">sound</span>(<span class="code">"piano"</span>);
+                  </div>
+                  </td>
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Apply Scale</td>
+                  <td>scale(<span class='text-gray-400'>string</span>)</td>
+                  <td>
+                    <div class="cursor-pointer active:scale-105 transition-all" onclick="new Audio('snippets/api/scale.wav').play()">
+                    <span class="function">chudel.note</span>(<span class="code">"0 2 4 &lt;[6,8] [7,9]&gt;"</span>).<span class="function">scale</span>(<span class="code">"C:minor"</span>);
+                  </div>
+                  </td>
+                </tr>
+                  <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Add Offset</td>
+                  <td>add(<span class='text-gray-400'>string</span>)</td>
+                  <td>
+                    <div class="cursor-pointer active:scale-105 transition-all" onclick="new Audio('snippets/api/add.wav').play()">
+                    <span class="function">chudel.note</span>(<span class="code">"0!4"</span>).<span class="function">add</span>(<span class="code">"1 2 3 4"</span>).<span class="function">scale</span>(<span class="code">"C:minor"</span>);
+                  </div>
+                  </td>
+
+                </tr>
+                <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Change Gain</td>
+                  <td>gain(<span class='text-gray-400'>string</span>)</td>
+                  <td><div class="cursor-pointer active:scale-105 transition-all" onclick="new Audio('snippets/api/gain.wav').play()">
+                    <span class="function">chudel.sound</span>(<span class="code">"hh*16"</span>).<span class="function">gain</span>(<span class="code">"[0.3 0.6]*2"</span>);
+                  </div>
+                </td>
+                </tr>
+                 <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Change Pan</td>
+                  <td>pan(<span class='text-gray-400'>string</span>)</td>
+                  <td><div class="cursor-pointer active:scale-105 transition-all" onclick="new Audio('snippets/api/pan.wav').play()">
+                    <span class="function">chudel.sound</span>(<span class="code">"cp!3"</span>).<span class="function">pan</span>(<span class="code">"-1 0 1"</span>);
+                    </div>
+                  </tr>
+                  <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Change Speed</td>
+                  <td>fast(<span class='text-gray-400'>string</span>)</td>
+                  <td>
+                    <div class="cursor-pointer active:scale-105 transition-all" onclick="new Audio('snippets/api/fast.wav').play()">
+                    <span class="function">chudel.sound</span>(<span class="code">"bd hh bd hh, - sd"</span>).<span class="function">fast</span>(<span class="code">"2"</span>);
+                    </div>
+                </tr>
+                   <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Add Sample</td>
+                  <td>register(<span class='text-gray-400'>key, file</span>)</td>
+                  <td>
+                    <span class="function">chudel.register</span>(<span class="code">"xd", "special:dope"</span>);
+                </tr>
+                  <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Read File</td>
+                  <td>livecode(<span class='text-gray-400'>file</span>)</td>
+                  <td>
+                    <span class="function">chudel.livecode</span>(<span class="code">"chudel.txt"</span>);
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h5 id="ch3" class="text-5xl text-center mt-20 mb-10 font-thin border-t pt-10">Musical Demos</h5>
+            <p class="text-center">Here are some Chudelian originals and covers to showcase different uses of the library.</p>
+            <table class="w-1/2 mx-auto">
+              <thead>
+                <tr class="border-b-2">
+                  <th class="px-6 py-4 text-left min-w-56">Name</th>
+                  <th class="px-6 py-4 text-left min-w-108">Code</th>
+                  <th class="px-6 py-4 text-left min-w-48">Audio</th>
+                </tr>
+              </thead>
+              <tbody>
+                 <tr class="border-b *:align-center *:px-6 *:py-4">
+                  <td>Cool Beat<br/><span class="text-slate-400 font-light">My Own</span></td>
+                  <td>
+                    <span class="function">chudel.sound</span>(<span class="code">"
+                      <div class="pl-2">[bd bd] &lt;[bd bd] [bd - - bd - - bd &lt;- bd&gt;]&gt;,</div>
+                      <div class="pl-2">[oh - &lt;- oh - oh*2&gt; oh - - oh -]*2,</div>
+                      <div class="pl-2">[- hh]!3 [- hh*2],</div>
+                      <div class="pl-2">[- sd]*4</div>"</span>);
+                      
+                  </td>
+                  <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/demo/beat.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                 <tr class="border-b *:align-center *:px-6 *:py-4">
+                 <td>Tetris Theme<br/><a class="text-slate-400 font-light hover:text-blue-400 hover:underline" href="https://strudel.cc/learn/mini-notation/">Strudel's Version</a></td>
+                  <td>
+                    <span class="function">chudel.note</span>(<span class="code">"
+                      <div class="pl-2">&lt;</div>
+                      <div class="pl-2">[e5 [b4 c5] d5 [c5 b4]]</div>
+                      <div class="pl-2">[a4 [a4 c5] e5 [d5 c5]]</div>
+                      <div class="pl-2">[b4 [~ c5] d5 e5]</div>
+                      <div class="pl-2">[c5 a4 a4 ~]</div>
+                      <div class="pl-2">[[~ d5] [~ f5] a5 [g5 f5]]</div>
+                      <div class="pl-2">[e5 [~ c5] e5 [d5 c5]]</div>
+                      <div class="pl-2">[b4 [b4 c5] d5 e5]</div>
+                      <div class="pl-2">[c5 a4 a4 ~]</div>
+                      <div class="pl-2">,</div>
+                      <div class="pl-2">[[e2 e3]*4]</div>
+                      <div class="pl-2">[[a2 a3]*4]</div>
+                      <div class="pl-2">[[g#2 g#3]*2 [e2 e3]*2]</div>
+                      <div class="pl-2">[a2 a3 a2 a3 a2 a3 b1 c2]</div>
+                      <div class="pl-2">[[d2 d3]*4]</div>
+                      <div class="pl-2">[[c2 c3]*4]</div>
+                      <div class="pl-2">[[b1 b2]*2 [e2 e3]*2]</div>
+                      <div class="pl-2">[[a1 a2]*4]</div>
+                      <span class="pl-2">>"</span></span>.<span class="function">sound</span>(<span class="code">"bass"</span>)</td></div>
+                    </span>
+                  </td>
+                  <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/demo/tetris.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+                 <tr class="*:align-center *:px-6 *:py-4">
+                 <td>Sweden (C418)<br/><span class="text-slate-400 font-light">My Simplification</span></td>
+                  <td>
+                    <span class="function">chudel.note</span>(<span class="code">"
+                      <div class="pl-2">[e2 f#2]</div>
+                      <div class="pl-2">[g2 b2]</div>
+                      <div class="pl-2">[a2 g2]</div>
+                      <div class="pl-2">[d2]</div>
+                      <div class="pl-2">,</div>
+                                            [e3,g3]
+                      <div class="pl-2">[a3,d4]</div>
+                      <div class="pl-2">[f#3,a3]</div>
+                      <div class="pl-2">[c#4,e4]</div>
+                      <div class="pl-2">[e3,g3,b3]</div>
+                      <div class="pl-2">[a3,d4,f#4]</div>
+                      <div class="pl-2">[f#3,a3,c#4]</div>
+                      <div class="pl-2">[a3,c#4,e4]</div>
+                      <div class="pl-2">,</div>
+                      <div class="pl-2">-!8</div>
+                      <div class="pl-2">[- [a4 b4]]</div>
+                      <div class="pl-2">[- [- [- [d4 e4]]]]</div>
+                      <div class="pl-2">[- [- [- [f#4 a4]]]]</div>
+                      <div class="pl-2">-</div>
+                      <div class="pl-2">[- d5 b4 a4]</div>
+                      <div class="pl-2">[- [- [- [d4 e4]]]]</div>
+                      <div class="pl-2">[- [- [- [a4 f#4]]]]</div>
+                      <div class="pl-2">-</div>
+                      <div class="pl-2">[- [a4 b4]]</div>
+                      <div class="pl-2">[d5 [- [- [f#5 e5]]]]</div>
+                      <div class="pl-2">[c#5 [- [- [d5 c#5]]]]</div>
+                      <div class="pl-2">a4</div>
+                      <div class="pl-2">[- [b4 a4]]</div>
+                      <div class="pl-2">[- [- [- [d4 e4]]]]</div>
+                      <div class="pl-2">[- [- [- [f#4 a4]]]]</div>
+                      <span class="pl-2">"</span>)</span>.<span class="function">sound</span>(<span class="code">"piano"</span>)</td></div>
+                    </span>
+                  </td>
+                  <td>
+                    <button class="size-10 ml-2 overflow-hidden rounded-full">
+                      <audio controls class="-ml-1.5 rounded-full -mt-2 w-40"><source src="snippets/demo/sweden.wav"></audio>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <section class="pb-10">
+             <h5 id="ch4" class="text-5xl text-center mt-20 mb-10 font-thin border-t pt-10">Acknowledgments</h5>
+             <div class="text-center *:min-w-1/2 *:max-w-3/5   *:mx-auto space-y-4">
+             <p> This project was started based a conversation I had with Rochelle Tham, and I certainly did not anticipate
+              getting as invested as I did. There is still much to be done, but I had to draw the line for now.
+             </p>
+             <p>Obviously, none of my work would have been possible without the inspiration of Strudel, whose work 
+              would not have been possible without the inspiration of Tidal. Thank you to the teams of both
+              and I now realize how much work went into these ridiculously impressive projects.
+             </p>
+             <p>
+              I adapted this project with the help of Strudel's two (slightly different) technical manuals, found
+              on their <a target="_blank" class="text-blue-400 hover:underline" href="https://strudel.cc/technical-manual/repl/">website</a> and on their 
+              <a class="text-blue-400 hover:underline" target="_blank" href="https://github.com/tidalcycles/strudel/wiki/Technical-Manual">repository</a>.
+              I still have many questions but these carried me all the way.
+             </p>
+            </div>
+             </section>
+      </article>
+    </main>
+  </body>
+</html>

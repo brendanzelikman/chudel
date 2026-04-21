@@ -1,0 +1,4 @@
+sound("
+    bd hh bd hh bd hh bd hh, 
+    [oh - <- oh - oh*2> oh - - oh -]*2
+")

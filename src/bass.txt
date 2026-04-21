@@ -1,0 +1,4 @@
+note("[0 1 <2 5> <1 2 3>]*4")
+.scale("C:minor")
+.add("-12 <-11 -8>")
+.sound("bass")
