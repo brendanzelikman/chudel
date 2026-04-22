@@ -196,7 +196,8 @@ public class PatternEffect extends PatternFunc {
     fun construct(PatternFunc base, PatternFunc effect){ base @=> this.base; effect @=> this.effect; }
     fun Hap[] query(Arc arc, float cycles){ return base.query(arc, cycles); }
 
-    fun Hap[] query(Arc arc, float cycles, string key){
+    // Named method (not an overload) so subclasses can call it unambiguously via ChucK's super
+    fun Hap[] applyKey(Arc arc, float cycles, string key){
         base.query(arc, cycles) @=> Hap baseHaps[];
         effect.query(arc, cycles) @=> Hap effectHaps[];
         baseHaps.size() => int baseSize;
@@ -205,7 +206,12 @@ public class PatternEffect extends PatternFunc {
 
         // If there is no base or effect, return appropriately
         if (!baseSize && !effectSize) return haps;
-        if (!baseSize) return effectHaps;
+        if (!baseSize) {
+            for (0 => int i; i < effectSize; i++) {
+                haps << effectHaps[i].copyWithNewValue(key, effectHaps[i].getValue());
+            }
+            return haps;
+        }
         if (!effectSize) return baseHaps;
 
         // Otherwise, apply the effect to each relevant base
@@ -221,35 +227,40 @@ public class PatternEffect extends PatternFunc {
 
 public class _Note extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
-    fun Hap[] query(Arc arc, float cycles){ return super.query(arc, cycles, "note"); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "note"); }
 }
 
 public class _Sound extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
-    fun Hap[] query(Arc arc, float cycles){ return super.query(arc, cycles, "sound"); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "sound"); }
 }
 
 public class _Scale extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
-    fun Hap[] query(Arc arc, float cycles){ return super.query(arc, cycles, "scale"); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "scale"); }
 }
 
 public class _Gain extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
-    fun Hap[] query(Arc arc, float cycles){ return super.query(arc, cycles, "gain"); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "gain"); }
 }
 
 public class _Pan extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
-    fun Hap[] query(Arc arc, float cycles){ return super.query(arc, cycles, "pan"); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "pan"); }
 }
 
 public class _Echo extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
-    fun Hap[] query(Arc arc, float cycles){ return super.query(arc, cycles, "echo"); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "echo"); }
+}
+
+public class _Midi extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "midi"); }
 }
 
 public class Add extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
-    fun Hap[] query(Arc arc, float cycles){ return super.query(arc, cycles, "offset"); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "offset"); }
 }

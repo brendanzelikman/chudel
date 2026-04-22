@@ -1,155 +1,213 @@
 @import "pattern.ck"
 @import "utils.ck"
 
+// -------------------------------------------------------
+// CachedEvent - a decoded event from one parse call
+// Times are normalized to 0->1 (one cycle)
+// -------------------------------------------------------
+public class CachedEvent {
+    "0" => string number;
+    string value;
+    float start;
+    float end;
+}
+
+// -------------------------------------------------------
+// MiniPatternFunc
+//   - Parses the input string ONCE via mini.chug on first query
+//   - Caches the decoded event list; all subsequent queries are fast O(n)
+//   - Arc mapping is pure ChucK arithmetic — no C++ calls per cycle
+// -------------------------------------------------------
+public class MiniPatternFunc extends PatternFunc {
+    mini m;
+    string rawInput;
+    Map @ sounds;          // shared sound registry for token classification
+
+    CachedEvent @ cache[0]; // decoded events (lazily populated)
+    int parsed;             // 0 = not yet parsed
+    int parsedCycle;        // last parsed cycle
+
+    fun Hap[] query(Arc arc, float cycles) {
+        rawInput.find("?") >= 0 => int hasDeg;
+        rawInput.find("<") >= 0 => int hasSeq;
+        rawInput.find("{") >= 0 => int hasPoly;
+        rawInput.find("%") >= 0 => int hasFeet;
+        rawInput.find("rand") >= 0 => int hasRand;
+        
+        (hasDeg || hasSeq || hasPoly || hasFeet || hasRand) => int isDynamic;
+        Math.floor(arc.start) $ int => int cycleInt;
+        
+        if (!parsed || (isDynamic && cycleInt != parsedCycle)) {
+            new CachedEvent[0] @=> cache;
+            buildCache(cycleInt);
+            cycleInt => parsedCycle;
+            1 => parsed;
+        }
+
+        Hap out[0];
+        for (0 => int i; i < cache.size(); i++) {
+            cache[i] @=> CachedEvent ev;
+            // Map 0->1 event times into the queried arc
+            arc.start + ev.start * arc.duration => float s;
+            arc.start + ev.end   * arc.duration => float e;
+            Arc a(s, e - s);
+            out << new Hap(classify(ev.value, ev.number), a);
+        }
+        return out;
+    }
+
+    // ------- Parse & decode -------
+
+    fun void buildCache(int cycle) {
+        m.parse(rawInput, cycle) => string result;
+
+        if (!result.length()) {
+            // Fallback: single atom over the whole cycle
+            CachedEvent ev;
+            rawInput => ev.value;
+            0.0 => ev.start;
+            1.0 => ev.end;
+            cache << ev;
+            return;
+        }
+
+        // Format: "value:sn/sd->en/ed|..."
+        Utils.split(result, "|") @=> string entries[];
+        for (string entry : entries) {
+            decodeEntry(entry) @=> CachedEvent ev;
+            if (ev != null) cache << ev;
+        }
+    }
+
+    fun CachedEvent decodeEntry(string entry) {
+        entry.length() => int len;
+
+        // Find last ':' followed by a digit or '-' (splits value from timing)
+        -1 => int col;
+        for (len - 1 => int i; i >= 0; i--) {
+            if (entry.charAt2(i) == ":" && i + 1 < len && digitOrMinus(entry.charAt2(i + 1))) {
+                i => col; break;
+            }
+        }
+        if (col < 0) return null;
+
+        entry.substring(0, col) => string value;
+        entry.substring(col + 1) => string timing;
+
+        // Find "->" in timing
+        -1 => int arrow;
+        for (0 => int i; i < timing.length() - 1; i++) {
+            if (timing.charAt2(i) == "-" && timing.charAt2(i + 1) == ">") {
+                i => arrow; break;
+            }
+        }
+        if (arrow < 0) return null;
+
+        CachedEvent ev;
+        // Split "name, N" — comma is optional; bare name defaults to sample 0
+        value.find(",") => int comma;
+        if (comma >= 0) {
+            value.substring(0, comma) => ev.value;
+            // C++ mini emits the index as a float ("1.000000"); normalise to int string
+            Std.itoa(Std.atof(value.substring(comma + 2)) $ int) => ev.number;
+        } else {
+            value => ev.value;
+            "0" => ev.number;
+        }
+        frac(timing.substring(0, arrow)) => ev.start;
+        frac(timing.substring(arrow + 2)) => ev.end;
+        return ev;
+    }
+
+    // Parse "n/d" → float
+    fun float frac(string s) {
+        -1 => int sl;
+        for (0 => int i; i < s.length(); i++) {
+            if (s.charAt2(i) == "/") { i => sl; break; }
+        }
+        if (sl < 0) return Std.atof(s);
+        Std.atof(s.substring(sl + 1)) => float den;
+        return den == 0.0 ? 0.0 : Std.atof(s.substring(0, sl)) / den;
+    }
+
+    // Classify a token into the right Map key for Hap
+    // 'v' is the bare name ("arpy"), 'n' is the sample index ("4")
+    // The Hap stores "arpy:4" so chudel.ck looks up the right path.
+    fun Map classify(string v, string n) {
+        if (v == "-" || v == "~") return new Map("note", v);
+        if (sounds != null && sounds.has(v)) return new Map("sound", v + ":" + n);
+        if (v.length() > 0 && (digit(v.charAt2(0)) || (v.charAt2(0) == "-" && v.length() > 1)))
+            return new Map("value", v);
+        return new Map("note", v);
+    }
+
+    fun int digit(string c) {
+        return c == "0" || c == "1" || c == "2" || c == "3" || c == "4" ||
+               c == "5" || c == "6" || c == "7" || c == "8" || c == "9";
+    }
+    fun int digitOrMinus(string c) {
+        return c == "-" || digit(c);
+    }
+}
+
+// -------------------------------------------------------
+// Parser — wraps mini.chug, provides the same API surface
+// as the old ChucK-native parser so chudel.ck is unchanged
+// -------------------------------------------------------
 public class Parser {
+    mini m;
     Map sounds;
     Map bases;
-    Utils utils;
 
-    // Initialize registry of sounds
-    ["bd", "sd", "hh", "oh", "cp", "ah", "do", "piano", "bass"] @=> string defaultSounds[];
-    fun @construct(){ for (string s : defaultSounds){ 
-        // "samples/" + s + ".wav" => string path;
-        s + ".wav" => string path;
+    me.dir(-1) + "Dirt-Samples/" => string folderName;
+    FileIO fio;
 
-        // Handle special files
-        if (s == "do") "special:dope" => path;
-        else if (s == "ah") "special:ahh" => path;
+    fio.open( folderName, FileIO.READ );
+    fio.dirList() @=> string names[];
 
-        // Handle base notes
-        60 => int base;
-        if (s == "piano") 61 => base;
-        else if (s == "bass") 48 => base;
+    string dirtSamples[names.size()][0];
 
-        // Register the sound
-        register(s, path, Std.itoa(base));
-    } }
-    fun void register(string k, string v){ sounds.set(k, v); }
-    fun void register(string k, string v, string b){ sounds.set(k, v); bases.set(k, b); }
+    for(0 => int i; i < names.size(); i++)
+    {
+        FileIO files;
+        if(files.open(folderName + names[i], FileIO.READ )){
+            files.dirList() @=> dirtSamples[names[i]];
+        }
+    } 
 
-    // Parse a mini notation string into a Pattern
-    fun Pattern parse(string t){
-        Utils.trim(t) => string token;
+    fun @construct() {
+        for (string s : names) {
+            if (dirtSamples[s].size() == 0) continue;
+            60 => int base;
+            if (s == "piano") 61 => base;
+            else if (s == "bass") 48 => base;
+            string baseStr;
+            Std.itoa(base) => baseStr;
 
-        // Handle commas
-        utils.isCommaSeparated(token) => int comma;
-        if (comma){
-            utils.uncomma(token) @=> string itemsStr[];
-            PatternFunc itemsPatterns[0];
-            for (string item : itemsStr){
-                itemsPatterns << parse(item).pattern;
+            // Register every sample in the folder as "name:N"
+            for (0 => int n; n < dirtSamples[s].size(); n++) {
+                folderName + s + "/" + dirtSamples[s][n] => string path;
+                register(s + ":" + Std.itoa(n), path, baseStr);
             }
-            return new Pattern(new Parallel(itemsPatterns));
+
+            // Also register bare name → sample 0 for classify() lookup
+            folderName + s + "/" + dirtSamples[s][0] => string path0;
+            register(s, path0, baseStr);
         }
-
-        // Handle spaces
-        utils.isSpaced(token) => int isSpaced;
-        if (isSpaced){
-            return new Pattern(new Sequence(unspace(token)));
-        }
-
-        // Handle groups
-        utils.isGrouped(token) => int isGrouped;
-        if (isGrouped){
-            utils.unbracket(token) @=> string inner;
-            parse(inner) @=> Pattern group;
-            return new Pattern(new Sequence([group.pattern]));
-        }
-
-        // Handle alternation
-        utils.isAlternated(token) => int isAlternated;
-        if (isAlternated){
-            utils.unbracket(token) => string content;
-            utils.uncomma(content) @=> string options[];
-            PatternFunc patterns[0];
-            for (string option : options){
-                unspace(option) @=> PatternFunc funcs[];
-                patterns << (new Pattern(new Alternate(funcs))).pattern;
-            }
-            return new Pattern(new Parallel(patterns));
-        }
-
-        // Handle multiplication
-        utils.isMultiplied(token) => int asterisk;
-        if (asterisk > -1){
-            parse(token.substring(0, asterisk)) @=> Pattern left;
-            parse(token.substring(asterisk+1)) @=> Pattern right;
-            return new Pattern(new Fast(left.pattern, right.pattern));
-        }
-
-        // Handle division
-        utils.isDivided(token) => int slash;
-        if (slash > -1){
-            parse(token.substring(0, slash)) @=> Pattern left;
-            parse(token.substring(slash+1)) @=> Pattern right;
-            return new Pattern(new Fast(left.pattern, right.pattern, 1));
-        }
-
-        // Compute the speed (density)
-        utils.isReplicated(token) => int rep;
-        if (rep > -1) {
-            token.substring(0, rep) => string item;
-            Std.atof(token.substring(rep+1)) => float speed;
-            parse(item) @=> Pattern p;
-            speed => p.pattern.density;
-            return new Pattern(new Replicate(p.pattern));
-        }
-
-        // Elongation
-        utils.isElongated(token) => int elongate;
-        if (elongate > -1) {
-            token.substring(0, elongate) => string item;
-            return parse(item);
-        }
-
-        // Return as a sound if possible
-        if (sounds.has(token)){
-            return new Pattern(new Atom(new Map("sound", token)));
-        }
-
-        // Return as a note if possible
-        Scale.getNote(token) => int note;
-        if (note != -1){
-            return new Pattern(new Atom(new Map("note", token)));
-        } 
-
-        // Otherwise, return as a generic value
-        return new Pattern(new Atom(new Map("value", token)));
     }
+    Sampler @ samplers[0];
 
-    // Deal with a sequence of space-separated tokens
-    fun PatternFunc[] unspace(string token){
-        utils.unspace(token) @=> string itemsStr[];
-        PatternFunc itemsPatterns[0];
+    fun void register(string k, string v) { sounds.set(k, v); }
+    fun void register(string k, string v, string b) { sounds.set(k, v); bases.set(k, b); }
 
-        for (0 => int i; i < itemsStr.size(); i++){
-            itemsStr[i] => string token;
-            token => string item;
-
-            // Compute the weight
-            utils.isElongated(token) => int elongate;
-            1.0 => float weight;
-            if (elongate > -1) {
-                Std.atof(item.substring(elongate+1)) => weight;
-                item.substring(0, elongate) => item;
-            }
-
-            // Compute the density
-            utils.isReplicated(item) => int rep;
-            1.0 => float density;
-            if (rep > -1) {
-                Std.atof(item.substring(rep+1)) => weight;
-                item.substring(0, rep) => item;
-                1 / weight => density;
-            }
-
-            parse(item) @=> Pattern p;
-            weight => p.pattern.weight;
-            density => p.pattern.density;
-            // if (rep > -1) itemsPatterns << new Replicate(p.pattern); else
-            itemsPatterns << p.pattern;
-        }
-        return itemsPatterns;
+    // Returns a Pattern backed by MiniPatternFunc.
+    // The C++ parse runs once lazily; all queries are fast ChucK arithmetic.
+    fun Pattern parse(string input) {
+        Utils.trim(input) => string t;
+        MiniPatternFunc pf;
+        m @=> pf.m;
+        sounds @=> pf.sounds;
+        t => pf.rawInput;
+        return new Pattern(pf);
     }
-
 }

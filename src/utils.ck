@@ -8,11 +8,15 @@ public class Utils {
     "chudel.txt" => static string defaultFile;
     fun static string readFile(){ return readFile(defaultFile); }
     fun static string readFile(string filePath){
+        
         fio.open(me.dir() + filePath, FileIO.READ);
         fio.good() => int fileOk;
         if (!fileOk) return "";
         string content;
-        while (fio.more()){ fio.readLine() => string line; line +=> content; }
+        while (fio.more()){ 
+            fio.readLine() => string line;
+            line + "\n" +=> content; 
+        }
         return content;
     }
 
@@ -112,9 +116,10 @@ public class Map {
     fun @construct(){}
     fun @construct(string k, string v){ set(k, v); }
     fun string[] keys(){ map.getKeys(string keys[0]); return keys; }
-    fun string get(string key){ return map[key]; }
+    fun string get(string key){ return has(key) ? map[key] : ""; }
     fun void set(string key, string value){ value => map[key]; }
-    fun int has(string key){ return Utils.find(keys(), key) > -1; }
+    //fun int has(string key){ return Utils.find(keys(), key) > -1; }
+    fun int has(string key){ return map.isInMap(key); }
     fun Map copy(){ Map m; keys() @=> string keys[]; for (string k : keys){ m.set(k, map[k]); } return m; }
     fun void clear(){ map.clear(); }
 }
