@@ -159,23 +159,30 @@ public class Parser {
     Map sounds;
     Map bases;
 
-    me.dir(-1) + "Dirt-Samples/" => string folderName;
-    FileIO fio;
+    Sampler @ samplers[0];
 
-    fio.open( folderName, FileIO.READ );
-    fio.dirList() @=> string names[];
-
-    string dirtSamples[names.size()][0];
-
-    for(0 => int i; i < names.size(); i++)
-    {
-        FileIO files;
-        if(files.open(folderName + names[i], FileIO.READ )){
-            files.dirList() @=> dirtSamples[names[i]];
+    fun void init(string folderName) {
+        if (folderName.charAt2(folderName.length()-1) != "/") {
+            folderName + "/" => folderName;
         }
-    } 
 
-    fun @construct() {
+        FileIO fio;
+        if (!fio.open( folderName, FileIO.READ )) {
+            <<< "[Parser] Could not open sample directory:", folderName >>>;
+            return;
+        }
+        fio.dirList() @=> string names[];
+
+        string dirtSamples[names.size()][0];
+
+        for(0 => int i; i < names.size(); i++)
+        {
+            FileIO files;
+            if(files.open(folderName + names[i], FileIO.READ )){
+                files.dirList() @=> dirtSamples[names[i]];
+            }
+        } 
+
         for (string s : names) {
             if (dirtSamples[s].size() == 0) continue;
             60 => int base;
@@ -191,11 +198,20 @@ public class Parser {
             }
 
             // Also register bare name → sample 0 for classify() lookup
-            folderName + s + "/" + dirtSamples[s][0] => string path0;
-            register(s, path0, baseStr);
+            if (dirtSamples[s].size() > 0) {
+                folderName + s + "/" + dirtSamples[s][0] => string path0;
+                register(s, path0, baseStr);
+            }
         }
     }
-    Sampler @ samplers[0];
+
+    fun @construct() {
+        init(me.dir(-1) + "Dirt-Samples/");
+    }
+
+    fun @construct(string folderName) {
+        init(folderName);
+    }
 
     fun void register(string k, string v) { sounds.set(k, v); }
     fun void register(string k, string v, string b) { sounds.set(k, v); bases.set(k, b); }

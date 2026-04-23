@@ -59,7 +59,15 @@ public class Chudel {
 
     Pattern pattern;
     Pattern @ tracks[0];   // one entry per $: orbit
-    Parser parser;
+    Parser @ parser;
+
+    fun @construct() {
+        new Parser() @=> parser;
+    }
+
+    fun @construct(string folderName) {
+        new Parser(folderName) @=> parser;
+    }
     true => static int print;
     fun void debug(){ true => print; }
     
@@ -68,7 +76,7 @@ public class Chudel {
 
     // MIDI support
     MidiOut mout;
-    mout.open(0) => int midiReady;
+    0 => int midiReady;
 
     // Main Chudel loop!
     fun void loop(){
@@ -268,7 +276,13 @@ public class Chudel {
                 else if (cmd == "fast") { this.fast(arg); }
                 else if (cmd == "slow") { this.slow(arg); }
                 else if (cmd == "add") { this.add(arg); }
-                else if (cmd == "midi") { this.midi(arg); }
+                else if (cmd == "midi") { 
+                    if (!midiReady) {
+                        mout.open(0) => midiReady;
+                        if (midiReady) <<< "[Chudel] MIDI auto-initialized on port 0" >>>;
+                    }
+                    this.midi(arg); 
+                }
                 else if (cmd == "orbit") { /* no-op */ }
             }
         }
