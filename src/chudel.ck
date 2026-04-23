@@ -295,19 +295,22 @@ public class Chudel {
         if (content == file) return;
         content => file;
 
-        if (content.find("hush") >= 0) {
-            clear();
-            return;
-        }
-
         // Split into lines and look for $: orbit markers
         Utils.split(content, "\n") @=> string lines[];
         Pattern @ newTracks[0];
         
         for (string line : lines) {
+            line.find("//") => int commentPos;
+
+            line.find("hush") => int hushPos;
+            if (hushPos >= 0 && (commentPos < 0 || hushPos < commentPos)) {
+                clear();
+                return;
+            }
+
             // Handle setcps and setcpm globals
             line.find("setcps(") => int cpsPos;
-            if (cpsPos >= 0) {
+            if (cpsPos >= 0 && (commentPos < 0 || cpsPos < commentPos)) {
                 line.find(")", cpsPos) => int endPos;
                 if (endPos > cpsPos) {
                     line.substring(cpsPos + 7, endPos - (cpsPos + 7)) => string arg;
@@ -317,7 +320,7 @@ public class Chudel {
                 }
             }
             line.find("setcpm(") => int cpmPos;
-            if (cpmPos >= 0) {
+            if (cpmPos >= 0 && (commentPos < 0 || cpmPos < commentPos)) {
                 line.find(")", cpmPos) => int endPos;
                 if (endPos > cpmPos) {
                     line.substring(cpmPos + 7, endPos - (cpmPos + 7)) => string arg;
@@ -327,7 +330,7 @@ public class Chudel {
                 }
             }
             line.find("setmidi(") => int midiPos;
-            if (midiPos >= 0) {
+            if (midiPos >= 0 && (commentPos < 0 || midiPos < commentPos)) {
                 line.find(")", midiPos) => int endPos;
                 if (endPos > midiPos) {
                     line.substring(midiPos + 8, endPos - (midiPos + 8)) => string arg;
@@ -338,7 +341,6 @@ public class Chudel {
                 }
             }
 
-            line.find("//") => int commentPos;
             line.find("$:") => int pos;
             if (pos < 0) continue;              // not an orbit line
             if (commentPos >= 0 && commentPos < pos) continue; // commented out

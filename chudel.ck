@@ -7,3 +7,5 @@
 @import "src/parser.ck"
 @import "src/examples.ck"
 @import "src/chudel.ck"
+
+dac.gain(0.5);
