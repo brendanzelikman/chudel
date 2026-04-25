@@ -109,6 +109,12 @@ public class Utils {
         flush(out, current);
         return out;
     }
+
+    // Get the string up until the given char
+    fun static string getSubstring(string text, string char){ 
+        text.find(char) => int spot;
+        return (spot >= 0) ? text.substring(0, spot) : text; 
+    }
 }
 
 public class Map {
@@ -118,7 +124,6 @@ public class Map {
     fun string[] keys(){ map.getKeys(string keys[0]); return keys; }
     fun string get(string key){ return has(key) ? map[key] : ""; }
     fun void set(string key, string value){ value => map[key]; }
-    //fun int has(string key){ return Utils.find(keys(), key) > -1; }
     fun int has(string key){ return map.isInMap(key); }
     fun Map copy(){ Map m; keys() @=> string keys[]; for (string k : keys){ m.set(k, map[k]); } return m; }
     fun void clear(){ map.clear(); }

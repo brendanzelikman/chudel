@@ -161,6 +161,10 @@ public class Parser {
 
     Sampler @ samplers[0];
 
+    fun @construct() { init(me.dir(-1) + "Dirt-Samples/"); }
+    fun @construct(string folderName) { init(folderName); }
+
+    // Initialize the sound bank by scanning the folder for samples
     fun void init(string folderName) {
         if (folderName.charAt2(folderName.length()-1) != "/") {
             folderName + "/" => folderName;
@@ -173,16 +177,16 @@ public class Parser {
         }
         fio.dirList() @=> string names[];
 
+        // Import each subfolder
         string dirtSamples[names.size()][0];
-
-        for(0 => int i; i < names.size(); i++)
-        {
+        for(0 => int i; i < names.size(); i++){
             FileIO files;
             if(files.open(folderName + names[i], FileIO.READ )){
                 files.dirList() @=> dirtSamples[names[i]];
             }
         } 
 
+        // Iterate over each name
         for (string s : names) {
             if (dirtSamples[s].size() == 0) continue;
             60 => int base;
@@ -205,16 +209,11 @@ public class Parser {
         }
     }
 
-    fun @construct() {
-        init(me.dir(-1) + "Dirt-Samples/");
-    }
-
-    fun @construct(string folderName) {
-        init(folderName);
-    }
 
     fun void register(string k, string v) { sounds.set(k, v); }
     fun void register(string k, string v, string b) { sounds.set(k, v); bases.set(k, b); }
+    
+    fun int parseNote(string name){  return bases.has(name) ? Std.atoi(bases.get(name)) : 60; }
 
     // Returns a Pattern backed by MiniPatternFunc.
     // The C++ parse runs once lazily; all queries are fast ChucK arithmetic.

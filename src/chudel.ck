@@ -2,8 +2,12 @@
 @import "parser.ck"
 @import "examples.ck"
 
-// Strudel in ChucK!
+// Strudel in ChucK! (...and more?!)
 public class Chudel {
+
+    // ------------------------------------------
+    // Timing
+    // ------------------------------------------
 
     0.1 => static float interval; // query time
     0.1 => static float latency; // start offset
@@ -12,13 +16,6 @@ public class Chudel {
     now/1::second => static float _lastTime;
     0 => int intervals;
     
-    fun static void setCps(float newCps) {
-        now/1::second => float currentTime;
-        (currentTime - _lastTime) * cps +=> _currentCycle;
-        currentTime => _lastTime;
-        newCps => cps;
-    }
-    
     fun static void update(){ interval::second => now; }
     fun int getIntervals(){ return intervals; }
     fun float getCycles(){ return _currentCycle + (now/1::second - _lastTime) * cps; }
@@ -26,6 +23,12 @@ public class Chudel {
     fun float ctos(float c){ return _lastTime + (c - _currentCycle) / cps; }
     fun float stoc(float s){ return _currentCycle + (s - _lastTime) * cps; }
     fun float itos(float i){ return i / interval; }
+    fun static void setCps(float newCps) {
+        now/1::second => float currentTime;
+        (currentTime - _lastTime) * cps +=> _currentCycle;
+        currentTime => _lastTime;
+        newCps => cps;
+    }
 
     // ------------------------------------------
     // Lazy Loader Shred
@@ -34,6 +37,7 @@ public class Chudel {
     Event loaderEvent;
     string loadQueue[0];
 
+    // Load samplers on demand
     fun void loaderShred() {
         while (true) {
             loaderEvent => now;
@@ -42,13 +46,9 @@ public class Chudel {
                 loadQueue.erase(0);
                 if (parser.samplers[key] == null) {
                     parser.sounds.get(key) => string path;
-                    
-                    key => string baseName;
-                    key.find(":") => int colon;
-                    if (colon >= 0) key.substring(0, colon) => baseName;
-                    
-                    parser.bases.has(baseName) ? Std.atoi(parser.bases.get(baseName)) : 60 => int baseNote;
-                    new Sampler(path, baseNote) @=> parser.samplers[key];
+                    Utils.getSubstring(key, ":") => string name;
+                    parser.parseNote(name) => int note;
+                    new Sampler(path, note) @=> parser.samplers[key];
                 }
             }
         }
@@ -61,13 +61,9 @@ public class Chudel {
     Pattern @ tracks[0];   // one entry per $: orbit
     Parser @ parser;
 
-    fun @construct() {
-        new Parser() @=> parser;
-    }
-
-    fun @construct(string folderName) {
-        new Parser(folderName) @=> parser;
-    }
+    fun @construct() { new Parser() @=> parser; }
+    fun @construct(string folderName) { new Parser(folderName) @=> parser; }
+    
     true => static int print;
     fun void debug(){ true => print; }
     
@@ -83,12 +79,14 @@ public class Chudel {
         getIntervals() => int intervals;
         getCycles() => float cycles;
         getSeconds() => float seconds;
-        // Collect haps from all active tracks overlapping the current time window
+
+        // Get the current time window
         stoc(seconds - interval/2) => float startC;
         stoc(seconds + interval/2) => float endC;
         Math.floor(startC) $ int => int startCycleInt;
         Math.floor(endC) $ int => int endCycleInt;
 
+        // Query and collect overlapping haps
         Hap haps[0];
         for (startCycleInt => int c; c <= endCycleInt; c++) {
             new Arc(c, 1) @=> Arc arc;
@@ -98,6 +96,7 @@ public class Chudel {
             }
         }
 
+        // Schedule haps for playback
         for (0 => int i; i < haps.size(); i++){
             ctos(haps[i].start()) => float startTime;
             haps[i].duration() / cps => float durTime;
@@ -125,8 +124,9 @@ public class Chudel {
         // Skip rests
         if (print) hap.print();
         if (hap.isRest()) return;
-
+        
         Utils.cleanDur((endTime - startTime + latency)::second) => dur duration;
+
         // Output audio and MIDI concurrently
         spork ~ playAudio(hap, duration);
         spork ~ playMidi(hap, duration);
@@ -134,35 +134,40 @@ public class Chudel {
         (duration - 1::samp) => now;
     }
 
+    // Play a hap's audio for the given duration
     fun void playAudio(Hap hap, dur duration){
+
         // Only default to piano if MIDI isn't exclusively handling this hap
         if (hap.has("midi") && !hap.has("sound")) return;
 
         hap.getSound() => string sound;
-        sound.find(":") => int colon;
-        (colon >= 0 ? sound.substring(0, colon) : sound) => string baseName;
+        Utils.getSubstring(sound, ":") => string baseName;
 
+        // Use the note value if it's registered
         if (hap.hasNote() && parser.sounds.has(baseName)) {
             Std.itoa(Std.atof(hap.getString("note")) $ int) => string noteIdx;
             baseName + ":" + noteIdx => sound;
         }
 
+        // Get the sampler key and skip unregistered sounds silently
         (parser.sounds.has(sound) ? sound : "piano") => string lookupKey;
-        if (!parser.sounds.has(lookupKey)) return;  // unregistered sound — skip silently
+        if (!parser.sounds.has(lookupKey)) return;
         
+        // Add the sampler to the queue and signal the loader
         if (parser.samplers[lookupKey] == null) {
             loadQueue << lookupKey;
             loaderEvent.signal();
         }
         
+        // Configure the sampler
         parser.samplers[lookupKey] @=> Sampler sampler;
         if (sampler == null) return;
-
         sampler.gain(hap.getGain());
         sampler.pan(hap.getPan());
         sampler.echo(hap.getEcho());
 
-        parser.bases.has(baseName) ? Std.atoi(parser.bases.get(baseName)) : 60 => int baseNote;
+        // Parse and play the note
+        parser.parseNote(baseName) => int baseNote;
         hap.hasNote() && parser.sounds.has(baseName) ? baseNote : hap.getNote() => int note;
         sampler.playOnce(note, duration);
     }
@@ -170,25 +175,24 @@ public class Chudel {
     fun void playMidi(Hap hap, dur duration){
         if (!hap.has("midi") || !midiReady) return;
 
-        Std.atoi(hap.getString("midi")) - 1 => int channel;
-        if (channel < 0) 0 => channel;
-        if (channel > 15) 15 => channel;
-        
+        // Extract the midi channel and note
+        Std.atoi(hap.getString("midi")) => int midi;
+        Math.clampi(midi - 1, 0, 15) => int channel;        
         hap.getNote() => int note;
 
+        // Send the note on message
         MidiMsg msg;
         0x90 + channel => msg.data1;
         note => msg.data2;
         127 => msg.data3;
         mout.send(msg);
-
         (duration/2.0) => now;
 
+        // Send the note off message
         0x80 + channel => msg.data1;
         note => msg.data2;
         0 => msg.data3;
         mout.send(msg);
-
         (duration/2.0) => now;
     }
 
@@ -301,16 +305,16 @@ public class Chudel {
         
         for (string line : lines) {
             line.find("//") => int commentPos;
-
+            commentPos < 0 => int noComment;
             line.find("hush") => int hushPos;
-            if (hushPos >= 0 && (commentPos < 0 || hushPos < commentPos)) {
+            if (hushPos >= 0 && (noComment || hushPos < commentPos)) {
                 clear();
                 return;
             }
 
             // Handle setcps and setcpm globals
             line.find("setcps(") => int cpsPos;
-            if (cpsPos >= 0 && (commentPos < 0 || cpsPos < commentPos)) {
+            if (cpsPos >= 0 && (noComment || cpsPos < commentPos)) {
                 line.find(")", cpsPos) => int endPos;
                 if (endPos > cpsPos) {
                     line.substring(cpsPos + 7, endPos - (cpsPos + 7)) => string arg;
@@ -320,7 +324,7 @@ public class Chudel {
                 }
             }
             line.find("setcpm(") => int cpmPos;
-            if (cpmPos >= 0 && (commentPos < 0 || cpmPos < commentPos)) {
+            if (cpmPos >= 0 && (noComment || cpmPos < commentPos)) {
                 line.find(")", cpmPos) => int endPos;
                 if (endPos > cpmPos) {
                     line.substring(cpmPos + 7, endPos - (cpmPos + 7)) => string arg;
@@ -330,7 +334,7 @@ public class Chudel {
                 }
             }
             line.find("setmidi(") => int midiPos;
-            if (midiPos >= 0 && (commentPos < 0 || midiPos < commentPos)) {
+            if (midiPos >= 0 && (noComment || midiPos < commentPos)) {
                 line.find(")", midiPos) => int endPos;
                 if (endPos > midiPos) {
                     line.substring(midiPos + 8, endPos - (midiPos + 8)) => string arg;
@@ -341,12 +345,15 @@ public class Chudel {
                 }
             }
 
+            // Skip lines without orbits
             line.find("$:") => int pos;
-            if (pos < 0) continue;              // not an orbit line
+            if (pos < 0) continue;
+
+            // Skip comments
             if (commentPos >= 0 && commentPos < pos) continue; // commented out
             
-            line.substring(pos + 2) => string chain;
             // Utils.trim only strips \n/\t; strip leading spaces too so commands match
+            line.substring(pos + 2) => string chain;
             while (chain.length() > 0 && chain.charAt2(0) == " ") chain.substring(1) => chain;
             
             clear();
@@ -356,11 +363,11 @@ public class Chudel {
             newTracks << p;
         }
 
+        // Add the tracks or treat whole content as one pattern if no $: found
         if (newTracks.size() > 0) {
             newTracks @=> tracks;
             newTracks[0] @=> pattern;
         } else {
-            // No $: found — treat whole content as one pattern
             clear();
             input(content);
             Pattern @ single[1];
