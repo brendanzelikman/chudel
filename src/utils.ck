@@ -24,9 +24,9 @@ public class Utils {
     // Math Utilities
     // ------------------------------------------
     
-    ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] @=> string digits[];
-    fun int mod(int a, int b){ return ((a % b) + b) % b; }
-    fun int isDigit(string char){ for (string d : digits){ if (char == d) return 1; } return 0; }
+    ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] @=> static string digits[];
+    fun static int mod(int a, int b){ return ((a % b) + b) % b; }
+    fun static int isDigit(string char){ for (0 => int i; i < digits.size(); i++){ if (char == digits[i]) return 1; } return 0; }
     fun static dur cleanDur(dur x){ return x < 0::ms ? 0::ms : x; }
 
     // ------------------------------------------
@@ -37,28 +37,39 @@ public class Utils {
     fun static int isLeftBracket(string s){ return s == "["; }
     fun static int isRightBracket(int s){ return s == ']'; }
     fun static int isRightBracket(string s){ return s == "]"; }
-    fun static int isLeftContainer(int s){ return s == '[' || s == '<' || s == '('; }
-    fun static int isLeftContainer(string s){ return s == "[" || s == "<" || s == "("; }
-    fun static int isRightContainer(int s){ return s == ']' || s == '>' || s == ')'; }
-    fun static int isRightContainer(string s){ return s == "]" || s == ">" || s == ")"; }
+    "[" => static string LEFT_BRACKET;
+    "]" => static string RIGHT_BRACKET;
+    "<" => static string LEFT_ANGLE;
+    ">" => static string RIGHT_ANGLE;
+    "(" => static string LEFT_PAREN;
+    ")" => static string RIGHT_PAREN;
+    fun static int isLeftContainer(string s){ return s == LEFT_BRACKET || s == LEFT_ANGLE || s == LEFT_PAREN; }
+    fun static int isRightContainer(string s){ return s == RIGHT_BRACKET || s == RIGHT_ANGLE || s == RIGHT_PAREN; }
     fun static int isSeparator(int s){ return s == ',' || s == ' '; }
-
-    fun int isMultiplied(string s){ return findOuterChar(s, "*", [" ", ","]); }
-    fun int isDivided(string s){ return findOuterChar(s, "/", [" ", ","]); }
-    fun int isElongated(string s){ return findOuterChar(s, "@", [" ", ","]); }
-    fun int isReplicated(string s){ return findOuterChar(s, "!", [" ", ","]); }
-    fun int isSpaced(string s){ return findOuterChar(s, " ", [","]) > -1; }
-    fun int isCommaSeparated(string s){ return findOuterChar(s, ",") > -1; }
-    fun int isAlternated(string s){ return s.length() > 2 && s.charAt2(0) == "<" && findOuterChar(s, ">") == s.length() - 1; }
-    fun int isGrouped(string s){ return s.length() > 2 && s.charAt2(0) == "[" && findOuterChar(s, "]") == s.length() - 1; }
 
     // ------------------------------------------
     // String Parsing
     // ------------------------------------------
 
     ["\n", "\t"] @=> static string trimChars[];
-    fun static string trim(string x){ x => string r; for (string c : trimChars){ r.replace(c, ""); } return r; }
-    fun string[] unspace(string s){ return outerSplit(s, " "); }
+    fun static string trim(string x){ x => string r; for (0 => int i; i < trimChars.size(); i++){ r.replace(trimChars[i], ""); } return r; }
+    fun static string[] outerSplit(string s, string f){
+        string out[0];
+        0 => int depth;
+        "" => string current;
+        for (0 => int i; i < s.length(); i++){
+            s.substring(i, 1) => string c;
+            if (isLeftContainer(c)) depth++;
+            else if (isRightContainer(c)) depth--;
+            if (depth == 0 && c == f) {
+                if (current.length() > 0) out << current.substring(0);
+                "" => current;
+            }
+            else c +=> current;
+        }
+        if (current.length() > 0) out << current.substring(0);
+        return out;
+    }
     fun string[] uncomma(string s){ return outerSplit(s, ","); }
     fun string unbracket(string s){ return s.length() < 2 ? s : s.substring(1, s.length() - 2); }
 
@@ -76,40 +87,6 @@ public class Utils {
         return out;
     }
     
-    // Search for a one-char string at the outermost level (avoid specific chars)
-    fun int findOuterChar(string s, string f){ return findOuterChar(s, f, string none[0]); }
-    fun int findOuterChar(string s, string f, string avoid[]){
-        0 => int depth;
-        s.length() => int length;
-        -1 => int found;
-        for (0 => int i; i < length; i++){
-            s.charAt2(i) => string c;
-            if (isLeftContainer(c)){ depth++; } 
-            else if (isRightContainer(c)){ depth--; }
-            if (depth != 0) continue;
-            if (c == f) i => found; continue;
-            if (found < 0) continue;
-            if (find(avoid, c) > -1) return -1;
-        }
-        return depth == 0 ? found : -1;
-    }
-
-    // Separate a string by char at the outermost level
-    fun static string[] outerSplit(string s, string f){
-        string out[0];
-        0 => int depth;
-        "" => string current;
-        for (0 => int i; i < s.length(); i++){
-            s.charAt2(i) => string c;
-            if (isLeftContainer(c)) depth++;
-            else if (isRightContainer(c)) depth--;
-            if (depth == 0 && c == f) flush(out, current);
-            else c +=> current;
-        }
-        flush(out, current);
-        return out;
-    }
-
     // Get the string up until the given char
     fun static string getSubstring(string text, string char){ 
         text.find(char) => int spot;
@@ -125,7 +102,7 @@ public class Map {
     fun string get(string key){ return has(key) ? map[key] : ""; }
     fun void set(string key, string value){ value => map[key]; }
     fun int has(string key){ return map.isInMap(key); }
-    fun Map copy(){ Map m; keys() @=> string keys[]; for (string k : keys){ m.set(k, map[k]); } return m; }
+    fun Map copy(){ Map m; keys() @=> string ks[]; for (0 => int i; i < ks.size(); i++){ m.set(ks[i], map[ks[i]]); } return m; }
     fun void clear(){ map.clear(); }
 }
 

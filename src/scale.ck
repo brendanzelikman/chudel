@@ -2,14 +2,12 @@
 
 public class Scale {
 
-    static Utils utils;
-
     // Convert a pitch class to a number ("C" => 0, "C#" => 1, etc.)
     fun static int getPitchClassNumber(string pc){
         string pitchClassMap[12][0];
-        ["B#", "C", "Cbb"] @=> pitchClassMap[0];
+        ["B#", "C", "Dbb"] @=> pitchClassMap[0];
         ["B##", "C#", "Db"] @=> pitchClassMap[1];
-        ["C##", "D", "Dbb"] @=> pitchClassMap[2];
+        ["C##", "D", "Ebb"] @=> pitchClassMap[2];
         ["D#", "Eb", "Fbb"] @=> pitchClassMap[3];
         ["D##", "E", "Fb"] @=> pitchClassMap[4];
         ["E#", "F", "Gbb"] @=> pitchClassMap[5];
@@ -38,7 +36,8 @@ public class Scale {
     // Get a note from a scale given a degree
     fun static int indexScale(int scale[], int degree){
         scale.size() => int modulus;
-        utils.mod(degree, modulus) => int index;
+        if (modulus == 0) return 60; // guard: scale lookup failed, return middle C
+        Utils.mod(degree, modulus) => int index;
         Math.floor((degree $ float / modulus)) $ int => int octaves;
         return scale[index] + octaves * 12;
     }
@@ -84,7 +83,7 @@ public class Scale {
         }
 
         // Parse the root note
-        if (utils.isDigit(root.charAt2(root.length() - 1))){
+        if (Utils.isDigit(root.charAt2(root.length() - 1))){
             Std.atoi(root.substring(root.length() - 1, 1)) => int octave;
             root.substring(0, root.length() - 1) => string pc;
             getPitch(pc, octave) => baseNote;
@@ -108,8 +107,9 @@ public class Scale {
         if (length == 0) return -1;
         if (note == "-" || note == "~") return -1;
 
-        // If the first digit is a number, parse as a MIDI note
-        if (length < 1 || utils.isDigit(note.charAt2(0))) return Std.atoi(note);
+        // If the first digit is a number, parse as an offset from middle C (0 = 60)
+        // Check for optional negative sign as well
+        if (length < 1 || Utils.isDigit(note.charAt2(0)) || (note.charAt2(0) == "-" && length > 1)) return 60 + Std.atoi(note);
 
         // Otherwise, parse as a pitch class with potential octave
         4 => int octave;
@@ -124,7 +124,7 @@ public class Scale {
         note.length() => int length;
         for (1 => int i; i < note.length(); i++){
             note.charAt2(i) => string char;
-            utils.isDigit(char) => int isDigit;
+            Utils.isDigit(char) => int isDigit;
             if (isDigit) return i;
         }
         return -1;

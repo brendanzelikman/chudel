@@ -1,6 +1,7 @@
+setbpm 126
 
 
-$: s("house:5*16?").gain("0.1")
+$: note("0 5@2 7,  2 3 7! <3 6> <2 4> ").s("arpy").scale("c:minor").gain("4").echo("0.3").lpf("1000").jcrev("0.3").slow("8")
 
 
-// hush
+ 

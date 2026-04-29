@@ -1,4 +1,4 @@
-@import "../mini.chug"
+@import "mini.chug"
 @import "src/utils.ck"
 @import "src/scale.ck"
 @import "src/sampler.ck"

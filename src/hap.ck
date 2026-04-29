@@ -1,5 +1,6 @@
 @import "scale.ck"
 @import "sampler.ck"
+@import "osc_source.ck"
 
 public class Hap {
     Map value;
@@ -34,13 +35,35 @@ public class Hap {
 
     // Notes
     60 => static int defaultNote;
-    fun int getNote(){ if (!hasNote()) return defaultNote; if (has("scale")) return indexScale(); return offsetNote(parseNote()); }
+    fun int getNote(){ 
+        if (hasNote()) {
+            if (has("scale")) return indexScale(); 
+            return offsetNote(parseNote()); 
+        }
+        return defaultNote;
+    }
     fun int isRest(){ return getNote() == -1 || getValue() == "-" || getValue() == "~"; }
-    fun int hasNote(){ return value.has("note"); }
-    fun int parseNote(){ return Scale.getNote(get("note")); }
+    fun int hasNote(){ return value.has("note") || value.has("n"); }
+    fun int parseNote(){ 
+        if (value.has("note")) return Scale.getNote(get("note")); 
+        if (value.has("n")) return 60 + (Std.atof(get("n")) $ int);
+        return -1;
+    }
     fun int offsetNote(int note){ return (note + (getOffset() $ int)); }
-    fun int indexScale(){ return Scale.indexScale(Scale.getScale(get("scale")), Std.atoi(get("note")) + (getOffset() $ int));}
+    fun int indexScale(){ 
+        string key;
+        if (value.has("note")) "note" => key; 
+        else if (value.has("n")) "n" => key;
+        else if (value.has("value")) "value" => key;
+        else return defaultNote;
 
+        Scale.indexScale(Scale.getScale(get("scale")), Std.atoi(get(key)) + (getOffset() $ int)) => int note;
+    
+        return note;
+    }
+
+    // I dont know if this is still needed but I'm leaving it for now. 
+    // TODO: Could you check?
     // Sound
     "piano" => static string defaultSound;
     fun string getSound(){ return getString("sound", defaultSound); }

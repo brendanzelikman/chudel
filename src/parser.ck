@@ -16,7 +16,7 @@ public class CachedEvent {
 // MiniPatternFunc
 //   - Parses the input string ONCE via mini.chug on first query
 //   - Caches the decoded event list; all subsequent queries are fast O(n)
-//   - Arc mapping is pure ChucK arithmetic — no C++ calls per cycle
+//   - Arc mapping is pure ChucK arithmetic - no C++ calls per cycle
 // -------------------------------------------------------
 public class MiniPatternFunc extends PatternFunc {
     mini m;
@@ -33,33 +33,58 @@ public class MiniPatternFunc extends PatternFunc {
         rawInput.find("{") >= 0 => int hasPoly;
         rawInput.find("%") >= 0 => int hasFeet;
         rawInput.find("rand") >= 0 => int hasRand;
+        rawInput.find("/") >= 0 => int hasDiv;
+        rawInput.find("*") >= 0 => int hasMul;
+        rawInput.find("|") >= 0 => int hasChoice;
+        rawInput.find("!") >= 0 => int hasRep;
+        rawInput.find("..") >= 0 => int hasRange;
         
-        (hasDeg || hasSeq || hasPoly || hasFeet || hasRand) => int isDynamic;
-        Math.floor(arc.start) $ int => int cycleInt;
+        (hasDeg || hasSeq || hasPoly || hasFeet || hasRand || hasDiv || hasMul || hasChoice || hasRep || hasRange) => int isDynamic;
         
-        if (!parsed || (isDynamic && cycleInt != parsedCycle)) {
+        if (!parsed || (isDynamic && (arc.start < parsedStart || arc.end > parsedEnd))) {
             new CachedEvent[0] @=> cache;
-            buildCache(cycleInt);
-            cycleInt => parsedCycle;
+            if (isDynamic) {
+                buildCache(arc.start, arc.end);
+                arc.start => parsedStart;
+                arc.end => parsedEnd;
+            } else {
+                buildCache(0, 1);
+            }
             1 => parsed;
         }
 
         Hap out[0];
-        for (0 => int i; i < cache.size(); i++) {
-            cache[i] @=> CachedEvent ev;
-            // Map 0->1 event times into the queried arc
-            arc.start + ev.start * arc.duration => float s;
-            arc.start + ev.end   * arc.duration => float e;
-            Arc a(s, e - s);
-            out << new Hap(classify(ev.value, ev.number), a);
+        if (isDynamic) {
+            for (0 => int i; i < cache.size(); i++) {
+                cache[i] @=> CachedEvent ev;
+                Arc a(ev.start, ev.end - ev.start);
+                out << new Hap(classify(ev.value, ev.number), a);
+            }
+        } else {
+            Math.floor(arc.start) $ int => int s_cycle;
+            Math.ceil(arc.end) $ int => int e_cycle;
+            for (s_cycle => int c; c < e_cycle; c++) {
+                for (0 => int i; i < cache.size(); i++) {
+                    cache[i] @=> CachedEvent ev;
+                    c + ev.start => float s;
+                    c + ev.end => float e;
+                    if (e > arc.start && s < arc.end) {
+                        Arc a(s, e - s);
+                        out << new Hap(classify(ev.value, ev.number), a);
+                    }
+                }
+            }
         }
         return out;
     }
 
+    float parsedStart, parsedEnd;
+
     // ------- Parse & decode -------
 
-    fun void buildCache(int cycle) {
-        m.parse(rawInput, cycle) => string result;
+    fun void buildCache(float start, float end) {
+        m.parse(rawInput, start, end) => string result;
+    
 
         if (!result.length()) {
             // Fallback: single atom over the whole cycle
@@ -104,7 +129,7 @@ public class MiniPatternFunc extends PatternFunc {
         if (arrow < 0) return null;
 
         CachedEvent ev;
-        // Split "name, N" — comma is optional; bare name defaults to sample 0
+        // Split "name, N" - comma is optional; bare name defaults to sample 0
         value.find(",") => int comma;
         if (comma >= 0) {
             value.substring(0, comma) => ev.value;
@@ -119,7 +144,7 @@ public class MiniPatternFunc extends PatternFunc {
         return ev;
     }
 
-    // Parse "n/d" → float
+    // Parse "n/d" -> float
     fun float frac(string s) {
         -1 => int sl;
         for (0 => int i; i < s.length(); i++) {
@@ -151,13 +176,14 @@ public class MiniPatternFunc extends PatternFunc {
 }
 
 // -------------------------------------------------------
-// Parser — wraps mini.chug, provides the same API surface
+// Parser - wraps mini.chug, provides the same API surface
 // as the old ChucK-native parser so chudel.ck is unchanged
 // -------------------------------------------------------
 public class Parser {
     mini m;
     Map sounds;
     Map bases;
+    Map ugens;               // oscillator type registry: name -> name
 
     Sampler @ samplers[0];
 
@@ -201,11 +227,20 @@ public class Parser {
                 register(s + ":" + Std.itoa(n), path, baseStr);
             }
 
-            // Also register bare name → sample 0 for classify() lookup
+            // Also register bare name -> sample 0 for classify() lookup
             if (dirtSamples[s].size() > 0) {
                 folderName + s + "/" + dirtSamples[s][0] => string path0;
                 register(s, path0, baseStr);
             }
+        }
+
+        // Register built-in oscillator sources
+        for (string osc : ["SinOsc", "TriOsc", "SawOsc", "SqrOsc", "PulseOsc", "Phasor", "Noise", "CNoise",
+                           "BLT", "Blit", "BlitSaw", "BlitSquare", "BandedWG", "BlowBotl", "BlowHole",
+                           "Bowed", "Brass", "Clarinet", "Flute", "Mandolin", "ModalBar", "Moog", "Saxofony", 
+                           "Shakers", "Sitar", "StifKarp", "VoicForm", "KrstlChr", "BeeThree",
+                           "FMVoices", "HevyMetl", "HnkyTonk", "FrencHrn", "PercFlut", "Rhodey", "TubeBell", "Wurley"]) {
+            ugens.set(osc, osc);
         }
     }
 
@@ -215,10 +250,65 @@ public class Parser {
     
     fun int parseNote(string name){  return bases.has(name) ? Std.atoi(bases.get(name)) : 60; }
 
-    // Returns a Pattern backed by MiniPatternFunc.
-    // The C++ parse runs once lazily; all queries are fast ChucK arithmetic.
+    // Create a fresh OscPlayer for every play event.
+    // Never cache: each sporked shred needs its own ADSR so concurrent notes
+    // of the same type don't corrupt each other's envelope state.
+    fun OscPlayer getOscPlayer(string name) {
+        OscPlayer @ p;
+        if (name == "SinOsc")        new SinOscPlayer   @=> p;
+        else if (name == "TriOsc")   new TriOscPlayer   @=> p;
+        else if (name == "SawOsc")   new SawOscPlayer   @=> p;
+        else if (name == "SqrOsc")   new SqrOscPlayer   @=> p;
+        else if (name == "PulseOsc") new PulseOscPlayer @=> p;
+        else if (name == "Phasor")   new PhasorPlayer   @=> p;
+        else if (name == "Noise")    new NoisePlayer    @=> p;
+        else if (name == "CNoise")   new CNoisePlayer   @=> p;
+        else if (name == "BLT")      new BLTPlayer @=> p;
+        else if (name == "Blit")     new BlitPlayer @=> p;
+        else if (name == "BlitSaw")  new BlitSawPlayer @=> p;
+        else if (name == "BlitSquare") new BlitSquarePlayer @=> p;
+        else if (name == "BandedWG") new BandedWGPlayer @=> p;
+        else if (name == "BlowBotl") new BlowBotlPlayer @=> p;
+        else if (name == "BlowHole") new BlowHolePlayer @=> p;
+        else if (name == "Bowed")    new BowedPlayer @=> p;
+        else if (name == "Brass")    new BrassPlayer @=> p;
+        else if (name == "Clarinet") new ClarinetPlayer @=> p;
+        else if (name == "Flute")    new FlutePlayer @=> p;
+        else if (name == "Mandolin") new MandolinPlayer @=> p;
+        else if (name == "ModalBar") new ModalBarPlayer @=> p;
+        else if (name == "Moog")     new MoogPlayer @=> p;
+        else if (name == "Saxofony") new SaxofonyPlayer @=> p;
+        else if (name == "Shakers")  new ShakersPlayer @=> p;
+        else if (name == "Sitar")    new SitarPlayer @=> p;
+        else if (name == "StifKarp") new StifKarpPlayer @=> p;
+        else if (name == "VoicForm") new VoicFormPlayer @=> p;
+        else if (name == "KrstlChr") new KrstlChrPlayer @=> p;
+        else if (name == "BeeThree") new BeeThreePlayer @=> p;
+        else if (name == "FMVoices") new FMVoicesPlayer @=> p;
+        else if (name == "HevyMetl") new HevyMetlPlayer @=> p;
+        else if (name == "HnkyTonk") new HnkyTonkPlayer @=> p;
+        else if (name == "FrencHrn") new FrencHrnPlayer @=> p;
+        else if (name == "PercFlut") new PercFlutPlayer @=> p;
+        else if (name == "Rhodey")   new RhodeyPlayer @=> p;
+        else if (name == "TubeBell") new TubeBellPlayer @=> p;
+        else if (name == "Wurley")   new WurleyPlayer @=> p;
+        return p;
+    }
+
+    // Returns a Pattern that emits the literal string verbatim (no mini.chug parsing).
+    // Required for parameters like scale names that contain ':' which mini.chug
+    // would otherwise interpret as a sample-index operator.
+    fun Pattern parseLiteral(string input) {
+        Utils.trim(input) => string t;
+        LiteralPatternFunc pf;
+        t => pf.rawValue;
+        return new Pattern(pf);
+    }
+
     fun Pattern parse(string input) {
         Utils.trim(input) => string t;
+        if (!t.length()) return new Pattern(new PatternFunc());
+
         MiniPatternFunc pf;
         m @=> pf.m;
         sounds @=> pf.sounds;
