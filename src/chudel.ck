@@ -2,6 +2,7 @@
 @import "parser.ck"
 @import "examples.ck"
 @import "audiograph.ck"
+@import "efx.ck"
 
 // Strudel in ChucK! (...and more?!)
 public class Chudel {
@@ -220,6 +221,16 @@ public class Chudel {
         if (hap.has("halfrect"))                                  chain << AudioGraph.halfrect();
         if (hap.has("fullrect"))                                  chain << AudioGraph.fullrect();
         if (hap.has("shifter") && hap.getFloat("shifter") != 1.0) chain << AudioGraph.shifter(hap.getFloat("shifter"), 1.0);
+        if (hap.has("fold") && hap.getFloat("fold") > 0) {
+            new Wavefolder() @=> Wavefolder w;
+            hap.getFloat("fold") => w.limit;
+            chain << w;
+        }
+        if (hap.has("crush") && hap.getFloat("crush") > 0) {
+            new Bitcrusher() @=> Bitcrusher c;
+            hap.getFloat("crush") => c.bits;
+            chain << c;
+        }
         if (hap.has("modulate") && hap.getFloat("modulate") > 0)  chain << AudioGraph.modulate(hap.getFloat("modulate"));
         if (hap.has("chorus") && hap.getFloat("chorus") > 0) {
             AudioGraph.chorus() @=> Chorus c; hap.getFloat("chorus") => c.mix; chain << c;
@@ -240,7 +251,13 @@ public class Chudel {
 
         // Connect chain: chain[0] → chain[1] → … → chain[last] → DAC
         for (0 => int i; i < chain.size() - 1; i++) chain[i] => chain[i+1];
-        chain[chain.size()-1] => dac;
+        if (hap.has("channel")) {
+            Std.atoi(hap.getString("channel")) => int chanIdx;
+            if (chanIdx >= 0 && chanIdx < dac.channels()) chain[chain.size()-1] => dac.chan(chanIdx);
+            else chain[chain.size()-1] => dac;
+        } else {
+            chain[chain.size()-1] => dac;
+        }
 
         UGen source;
 
@@ -248,6 +265,16 @@ public class Chudel {
         if (parser.ugens.has(baseName)) {
             parser.getOscPlayer(baseName) @=> OscPlayer osc;
             if (osc != null) {
+                if (hap.has("adsr")) {
+                    Utils.split(hap.getString("adsr"), ":") @=> string adsrParts[];
+                    if (adsrParts.size() == 4) {
+                        osc.env.set(Std.atof(adsrParts[0])::second, Std.atof(adsrParts[1])::second, Std.atof(adsrParts[2]), Std.atof(adsrParts[3])::second);
+                    }
+                }
+                if (hap.has("attack")) osc.env.attackTime(Std.atof(hap.getString("attack"))::second);
+                if (hap.has("decay")) osc.env.decayTime(Std.atof(hap.getString("decay"))::second);
+                if (hap.has("sustain")) osc.env.sustainLevel(Std.atof(hap.getString("sustain")));
+                if (hap.has("release")) osc.env.releaseTime(Std.atof(hap.getString("release"))::second);
                 osc.env @=> source;
                 source => chain[0];
                 osc.playOnce(playNote, duration);
@@ -259,9 +286,23 @@ public class Chudel {
             if (parser.sounds.has(lookupKey)) {
                 parser.samplers[lookupKey] @=> Sampler sampler;
                 if (sampler != null) {
+                    if (hap.has("adsr")) {
+                        Utils.split(hap.getString("adsr"), ":") @=> string adsrParts[];
+                        if (adsrParts.size() == 4) {
+                            sampler.env.set(Std.atof(adsrParts[0])::second, Std.atof(adsrParts[1])::second, Std.atof(adsrParts[2]), Std.atof(adsrParts[3])::second);
+                        }
+                    }
+                    if (hap.has("attack")) sampler.env.attackTime(Std.atof(hap.getString("attack"))::second);
+                    if (hap.has("decay")) sampler.env.decayTime(Std.atof(hap.getString("decay"))::second);
+                    if (hap.has("sustain")) sampler.env.sustainLevel(Std.atof(hap.getString("sustain")));
+                    if (hap.has("release")) sampler.env.releaseTime(Std.atof(hap.getString("release"))::second);
                     sampler.env @=> source;
                     source => chain[0];
-                    sampler.playOnce(playNote, duration);
+                    0.0 => float begin;
+                    1.0 => float end;
+                    if (hap.has("begin")) hap.getFloat("begin") => begin;
+                    if (hap.has("end")) hap.getFloat("end") => end;
+                    sampler.playOnce(playNote, duration, begin, end);
                 }
             }
         }
@@ -274,7 +315,13 @@ public class Chudel {
             1.0::second => now;   // shred sleeps; reverb/delay rings naturally
         }
         
-        chain[chain.size()-1] =< dac;
+        if (hap.has("channel")) {
+            Std.atoi(hap.getString("channel")) => int chanIdx;
+            if (chanIdx >= 0 && chanIdx < dac.channels()) chain[chain.size()-1] =< dac.chan(chanIdx);
+            else chain[chain.size()-1] =< dac;
+        } else {
+            chain[chain.size()-1] =< dac;
+        }
     }
 
     fun void playMidi(Hap hap, dur duration){
@@ -367,6 +414,77 @@ public class Chudel {
     fun Chudel twozero(string input){ return func(new _TwoZero(pattern.pattern, parse(input))); }
     fun Chudel polezero(string input){ return func(new _PoleZero(pattern.pattern, parse(input))); }
     fun Chudel modulate(string input){ return func(new _Modulate(pattern.pattern, parse(input))); }
+    fun Chudel adsr(string input){ return func(new _Adsr(pattern.pattern, parse(input))); }
+    fun Chudel attack(string input){ return func(new _Attack(pattern.pattern, parse(input))); }
+    fun Chudel decay(string input){ return func(new _Decay(pattern.pattern, parse(input))); }
+    fun Chudel sustain(string input){ return func(new _Sustain(pattern.pattern, parse(input))); }
+    fun Chudel release(string input){ return func(new _Release(pattern.pattern, parse(input))); }
+    fun Chudel channel(string input){ return func(new _Channel(pattern.pattern, parse(input))); }
+    fun Chudel begin(string input){ return func(new _Begin(pattern.pattern, parse(input))); }
+    fun Chudel end(string input){ return func(new _End(pattern.pattern, parse(input))); }
+    fun Chudel fold(string input){ return func(new _Fold(pattern.pattern, parse(input))); }
+    fun Chudel crush(string input){ return func(new _Crush(pattern.pattern, parse(input))); }
+    fun Chudel rev(string input){ return func(new _Rev(pattern.pattern)); }
+    fun Chudel palindrome(string input){ return every("2, rev()"); }
+    fun Chudel degradeBy(string input){ return func(new _DegradeBy(pattern.pattern, Std.atof(input))); }
+    fun Chudel degrade(string input){ return degradeBy("0.5"); }
+    fun Chudel fastGap(string input){ return func(new FastGap(pattern.pattern, parse(input))); }
+    
+    fun Chudel every(string input) {
+        Utils.outerSplit(input, ",") @=> string parts[];
+        if (parts.size() == 2) {
+            Std.atoi(Utils.trim(parts[0])) => int n;
+            Utils.trim(parts[1]) => string funcStr;
+            if (funcStr.length() >= 2 && funcStr.substring(0, 1) == "'" && funcStr.substring(funcStr.length() - 1, 1) == "'") {
+                funcStr.substring(1, funcStr.length() - 2) => funcStr;
+            } else if (funcStr.length() >= 2 && funcStr.substring(0, 1) == "\"" && funcStr.substring(funcStr.length() - 1, 1) == "\"") {
+                funcStr.substring(1, funcStr.length() - 2) => funcStr;
+            }
+            Chudel temp;
+            temp.func(this.pattern.pattern);
+            temp.input(funcStr);
+            return func(new _Every(this.pattern.pattern, n, temp.pattern.pattern));
+        }
+        return this;
+    }
+    
+    fun Chudel sometimesBy(string input) {
+        Utils.outerSplit(input, ",") @=> string parts[];
+        if (parts.size() == 2) {
+            Std.atof(Utils.trim(parts[0])) => float prob;
+            Utils.trim(parts[1]) => string funcStr;
+            if (funcStr.length() >= 2 && funcStr.substring(0, 1) == "'" && funcStr.substring(funcStr.length() - 1, 1) == "'") {
+                funcStr.substring(1, funcStr.length() - 2) => funcStr;
+            } else if (funcStr.length() >= 2 && funcStr.substring(0, 1) == "\"" && funcStr.substring(funcStr.length() - 1, 1) == "\"") {
+                funcStr.substring(1, funcStr.length() - 2) => funcStr;
+            }
+            Chudel temp;
+            temp.func(this.pattern.pattern);
+            temp.input(funcStr);
+            return func(new _SometimesBy(this.pattern.pattern, prob, temp.pattern.pattern));
+        }
+        return this;
+    }
+    
+    fun Chudel sometimes(string input) {
+        return sometimesBy("0.5," + input);
+    }
+
+    fun Chudel always(string input) {
+        return sometimesBy("1.0," + input);
+    }
+
+    fun Chudel almostAlways(string input) {
+        return sometimesBy("0.9," + input);
+    }
+
+    fun Chudel almostNever(string input) {
+        return sometimesBy("0.1," + input);
+    }
+
+    fun Chudel rarely(string input) {
+        return sometimesBy("0.25," + input);
+    }
 
     // ------------------------------------------
     // Transpiling Input
@@ -376,7 +494,8 @@ public class Chudel {
      "jcrev", "nrev", "prcrev", "lpf", "hpf", "chorus", "shifter",
      "delay", "delayl", "delaya", "halfrect", "fullrect",
      "bpf", "brf", "biquad", "resonz", "onepole", "onezero",
-     "twopole", "twozero", "polezero", "modulate"] @=> static string commands[];
+     "twopole", "twozero", "polezero", "modulate", "adsr",
+     "attack", "decay", "sustain", "release", "channel", "begin", "end", "every", "sometimesBy", "sometimes", "always", "almostAlways", "almostNever", "rarely", "fold", "crush", "rev", "palindrome", "degradeBy", "degrade", "fastGap"] @=> static string commands[];
 
     fun Chudel input(string l){
         Utils.trim(l) => string line;
@@ -386,35 +505,43 @@ public class Chudel {
             parts[i] => string p;
             Utils.trim(p) => string part;
             part.length() => int length;
-            int hasQuotes;
-            int closure;
-            if (length >= 4 && p.substring(length - 2, 2) == "\")") {
-                1 => hasQuotes;
-                length - 2 => closure;
-            } else if (length >= 3 && p.substring(length - 2, 2) == "()") {
-                0 => hasQuotes;
-                length - 2 => closure;
-            } else continue;
+            part.find("(") => int openParen;
+            if (openParen < 0 || part.substring(length - 1, 1) != ")") continue;
+            
+            part.substring(0, openParen) => string partCmd;
+            part.substring(openParen + 1, length - openParen - 2) => string argRaw;
+            
+            if (argRaw.length() >= 2 && argRaw.substring(0, 1) == "\"" && argRaw.substring(argRaw.length() - 1, 1) == "\"") {
+                argRaw.substring(1, argRaw.length() - 2) => argRaw;
+            }
+            if (argRaw.find("choose(") == 0) {
+                argRaw.substring(7, argRaw.length() - 8) => string inner;
+                Utils.outerSplit(inner, ",") @=> string choices[];
+                "[" => string result;
+                for (0 => int k; k < choices.size(); k++) {
+                    Utils.trim(choices[k]) => string c;
+                    if (c.length() >= 2 && c.substring(0, 1) == "\"" && c.substring(c.length() - 1, 1) == "\"") {
+                        c.substring(1, c.length() - 2) => c;
+                    } else if (c.length() >= 2 && c.substring(0, 1) == "'" && c.substring(c.length() - 1, 1) == "'") {
+                        c.substring(1, c.length() - 2) => c;
+                    }
+                    c +=> result;
+                    if (k < choices.size() - 1) "|" +=> result;
+                }
+                "]" +=> result;
+                result => argRaw;
+            }
+            if (argRaw == "" && partCmd != "midi") "0" => argRaw;
+            if (argRaw == "" && partCmd == "midi") "1" => argRaw;
 
             // Process each command
             for (0 => int j; j < commands.size(); j++){
-                commands[j] => string cmd;
-                cmd.length() => int len;
-                string arg;
-                
-                if (hasQuotes) {
-                    if (length < len + 4) continue;
-                    if (part.substring(0, len + 2) != cmd + "(\"") continue;
-                    part.substring(len + 2, closure - (len + 2)) => arg;
-                } else {
-                    if (length != len + 2) continue;
-                    if (part.substring(0, len + 2) != cmd + "()") continue;
-                    if (cmd == "midi") "1" => arg;
-                    else "0" => arg;
-                }
+                if (commands[j] == partCmd || (commands[j] == "sound" && partCmd == "s")) {
+                    commands[j] => string cmd;
+                    argRaw => string arg;
 
                 // Parse the command
-                if (cmd == "note" || cmd == "not") { this.note(arg); }
+                if (cmd == "note") { this.note(arg); }
                 else if (cmd == "n") { this.n(arg); }
                 else if (cmd == "scale") { this.scale(arg); }
                 else if (cmd == "sound") { this.sound(arg); }
@@ -455,6 +582,29 @@ public class Chudel {
                 else if (cmd == "twozero") { this.twozero(arg); }
                 else if (cmd == "polezero") { this.polezero(arg); }
                 else if (cmd == "modulate") { this.modulate(arg); }
+                else if (cmd == "adsr") { this.adsr(arg); }
+                else if (cmd == "attack") { this.attack(arg); }
+                else if (cmd == "decay") { this.decay(arg); }
+                else if (cmd == "sustain") { this.sustain(arg); }
+                else if (cmd == "release") { this.release(arg); }
+                else if (cmd == "channel") { this.channel(arg); }
+                else if (cmd == "begin") { this.begin(arg); }
+                else if (cmd == "end") { this.end(arg); }
+                else if (cmd == "fold") { this.fold(arg); }
+                else if (cmd == "crush") { this.crush(arg); }
+                else if (cmd == "rev") { this.rev(arg); }
+                else if (cmd == "palindrome") { this.palindrome(arg); }
+                else if (cmd == "degradeBy") { this.degradeBy(arg); }
+                else if (cmd == "degrade") { this.degrade(arg); }
+                else if (cmd == "fastGap") { this.fastGap(arg); }
+                else if (cmd == "every") { this.every(arg); }
+                else if (cmd == "sometimesBy") { this.sometimesBy(arg); }
+                else if (cmd == "sometimes") { this.sometimes(arg); }
+                else if (cmd == "always") { this.always(arg); }
+                else if (cmd == "almostAlways") { this.almostAlways(arg); }
+                else if (cmd == "almostNever") { this.almostNever(arg); }
+                else if (cmd == "rarely") { this.rarely(arg); }
+            }
             }
         }
         return this;

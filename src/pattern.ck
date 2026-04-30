@@ -90,6 +90,59 @@ public class Fast extends PatternFunc {
     }
 } 
 
+public class FastGap extends PatternFunc {
+    PatternFunc left; // multiplicand
+    PatternFunc right; // multiplier
+    fun @construct(PatternFunc left, PatternFunc right){
+        left @=> this.left;
+        right @=> this.right;
+    }
+    
+    fun Hap[] query(Arc arc, float cycles){
+        right.query(arc, cycles) @=> Hap rightHaps[];
+        Hap out[0];
+
+        if (rightHaps.size() == 0) return out;
+
+        for (0 => int i; i < rightHaps.size(); i++){
+            rightHaps[i] @=> Hap rightHap;
+            rightHap.getValue() => string note;
+            Std.atof(note) => float factor;
+            if (factor <= 0) continue;
+
+            arc.start => float s;
+            arc.end => float e;
+            if (rightHap.arc.start > s) rightHap.arc.start => s;
+            if (rightHap.arc.end < e) rightHap.arc.end => e;
+            if (s >= e) continue;
+
+            Math.floor(s) $ int => int cycleIdx;
+            s * factor => float fastS;
+            e * factor => float fastE;
+            
+            cycleIdx * factor + 1.0 => float limit;
+            if (fastS >= limit) continue;
+            if (fastE > limit) limit => fastE;
+            if (fastS >= fastE) continue;
+            
+            new Arc(fastS, fastE - fastS) @=> Arc fastArc;
+            left.query(fastArc, cycles * factor) @=> Hap subHaps[];
+            
+            for (0 => int j; j < subHaps.size(); j++){
+                subHaps[j] @=> Hap h;
+                h.arc.start => float hs;
+                h.arc.end => float he;
+                if (hs < fastS) fastS => hs;
+                if (he > fastE) fastE => he;
+                if (hs >= he) continue;
+                
+                out << new Hap(h.value, new Arc(hs / factor, (he - hs) / factor));
+            }
+        }
+        return out;
+    }
+} 
+
 // --------------------------------------------------
 // Pattern Effects
 // --------------------------------------------------
@@ -307,4 +360,146 @@ public class _PoleZero extends PatternEffect {
 public class _Modulate extends PatternEffect {
     fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
     fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "modulate"); }
+}
+
+public class _Adsr extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "adsr"); }
+}
+
+public class _Attack extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "attack"); }
+}
+
+public class _Decay extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "decay"); }
+}
+
+public class _Sustain extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "sustain"); }
+}
+
+public class _Release extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "release"); }
+}
+
+public class _Channel extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "channel"); }
+}
+
+public class _Begin extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "begin"); }
+}
+
+public class _End extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "end"); }
+}
+
+public class _Fold extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "fold"); }
+}
+
+public class _Crush extends PatternEffect {
+    fun @construct(PatternFunc base, PatternFunc effect){ return super.construct(base, effect); }
+    fun Hap[] query(Arc arc, float cycles){ return applyKey(arc, cycles, "crush"); }
+}
+
+public class _Rev extends PatternFunc {
+    PatternFunc base;
+    fun @construct(PatternFunc base){ base @=> this.base; }
+    
+    fun Hap[] query(Arc arc, float cycles){
+        Math.floor(arc.start) $ int => int startCycle;
+        Math.ceil(arc.end) $ int => int endCycle;
+        
+        Hap out[0];
+        for (startCycle => int c; c < endCycle; c++){
+            arc.start => float s;
+            arc.end => float e;
+            if (c > s) c => s;
+            if (c + 1 < e) c + 1 => e;
+            if (s >= e) continue;
+            
+            c * 2 + 1.0 - e => float baseS;
+            c * 2 + 1.0 - s => float baseE;
+            
+            base.query(new Arc(baseS, baseE - baseS), cycles) @=> Hap subHaps[];
+            for (0 => int i; i < subHaps.size(); i++){
+                subHaps[i] @=> Hap h;
+                c * 2 + 1.0 - (h.arc.start + h.arc.duration) => float newStart;
+                h.arc.duration => float newDur;
+                out << new Hap(h.value, new Arc(newStart, newDur));
+            }
+        }
+        return out;
+    }
+}
+
+public class _Every extends PatternFunc {
+    PatternFunc base;
+    PatternFunc effect;
+    int n;
+    
+    fun @construct(PatternFunc base, int n, PatternFunc effect){ 
+        base @=> this.base; 
+        n => this.n;
+        effect @=> this.effect; 
+    }
+    
+    fun Hap[] query(Arc arc, float cycles){
+        Math.floor(arc.start) $ int => int currentCycle;
+        if (n > 0 && currentCycle % n == 0) {
+           return effect.query(arc, cycles);
+        } else {
+           return base.query(arc, cycles);
+        }
+    }
+}
+
+public class _SometimesBy extends PatternFunc {
+    PatternFunc base;
+    PatternFunc effect;
+    float prob;
+    
+    fun @construct(PatternFunc base, float prob, PatternFunc effect){ 
+        base @=> this.base; 
+        prob => this.prob;
+        effect @=> this.effect; 
+    }
+    
+    fun Hap[] query(Arc arc, float cycles){
+        if (Math.random2f(0.0, 1.0) < prob) {
+           return effect.query(arc, cycles);
+        } else {
+           return base.query(arc, cycles);
+        }
+    }
+}
+
+public class _DegradeBy extends PatternFunc {
+    PatternFunc base;
+    float prob;
+    
+    fun @construct(PatternFunc base, float prob){
+        base @=> this.base;
+        prob => this.prob;
+    }
+    
+    fun Hap[] query(Arc arc, float cycles){
+        base.query(arc, cycles) @=> Hap haps[];
+        Hap out[0];
+        for (0 => int i; i < haps.size(); i++){
+            // Drops event with probability 'prob'
+            if (Math.random2f(0.0, 1.0) >= prob) out << haps[i];
+        }
+        return out;
+    }
 }

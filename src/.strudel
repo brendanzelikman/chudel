@@ -1,7 +1,7 @@
 setbpm 126
 
 
-$: note("0 5@2 7,  2 3 7! <3 6> <2 4> ").s("arpy").scale("c:minor").gain("4").echo("0.3").lpf("1000").jcrev("0.3").slow("8")
+$: note("0 5@2 7,  2 3 7! <3 6> <2 4> ").every(2,rev()).s("hh").scale("[c:minor eb:major]/4").gain("0.1")
 
 
  

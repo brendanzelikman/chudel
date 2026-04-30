@@ -17,10 +17,20 @@ public class Sampler {
     fun float getRate(int note){ return Math.pow(2.0, (note - baseNote) / 12.0); }
 
     // Play a note for a given duration
-    fun void play(int note){ 
+    fun void play(int note, float begin){ 
         getRate(note) => buf.rate; 
-        0 => buf.pos; 
+        (begin * buf.frames()) $ int => buf.pos; 
     }
+    fun void play(int note){ play(note, 0.0); }
     fun void envelope(dur duration){ env.keyOn(); Utils.cleanDur(duration - env.releaseTime()) => now; env.keyOff(); env.releaseTime() => now; }
-    fun void playOnce(int note, dur duration){ play(note); envelope(duration);}
+    fun void playOnce(int note, dur duration, float begin, float end){ 
+        play(note, begin); 
+        Math.fabs(buf.rate()) => float r;
+        if (r > 0) {
+            (end - begin) * buf.length() / r => dur sampleDur;
+            if (duration > sampleDur) sampleDur => duration;
+        }
+        envelope(duration);
+    }
+    fun void playOnce(int note, dur duration){ playOnce(note, duration, 0.0, 1.0); }
 }
